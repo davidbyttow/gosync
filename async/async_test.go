@@ -24,15 +24,16 @@ func TestForEach(t *testing.T) {
 	t.Run("mutates input", func(t *testing.T) {
 		t.Parallel()
 		input := []int{1, 2, 3, 4, 5}
-		async.ForEach(input, func(i int, v *int) {
-			*v = *v * i
+		var total atomic.Int64
+		async.ForEach(input, func(i int, v int) {
+			total.Add(int64(v))
 		})
-		require.Equal(t, []int{0, 2, 6, 12, 20}, input)
+		require.Equal(t, 15, int(total.Load()))
 	})
 	t.Run("handles panic", func(t *testing.T) {
 		t.Parallel()
 		fn := func() {
-			async.ForEach([]int{0}, func(i int, v *int) {
+			async.ForEach([]int{0}, func(i int, v int) {
 				panic("error")
 			})
 		}
@@ -49,7 +50,7 @@ func TestIterator(t *testing.T) {
 		input := make([]int, limit)
 		done := make(chan struct{})
 		var count atomic.Int64
-		iter.ForEach(input, func(i int, v *int) {
+		iter.ForEach(input, func(i int, v int) {
 			defer count.Add(-1)
 			if int(count.Add(1)) == limit {
 				close(done)
@@ -57,9 +58,7 @@ func TestIterator(t *testing.T) {
 			} else {
 				<-done
 			}
-			*v = 1
 		})
-		require.Equal(t, 1, input[0])
 	})
 }
 
@@ -94,7 +93,6 @@ func TestPool(t *testing.T) {
 			}
 		}
 	})
-
 	t.Run("is limited", func(t *testing.T) {
 		t.Parallel()
 
@@ -134,7 +132,6 @@ func TestErrorPool(t *testing.T) {
 		err := pool.Wait()
 		require.Equal(t, "one", err.Error())
 	})
-
 	t.Run("handles multiple errors", func(t *testing.T) {
 		t.Parallel()
 		pool := async.NewPool().WithErrors()

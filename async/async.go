@@ -8,7 +8,7 @@ import (
 	"github.com/davidbyttow/gosync/safe"
 )
 
-func ForEach[T any](items []T, fn func(int, *T)) {
+func ForEach[T any](items []T, fn func(int, T)) {
 	forEach(items, fn, 0)
 }
 
@@ -16,11 +16,11 @@ type Iterator[T any] struct {
 	MaxWorkers int
 }
 
-func (iter Iterator[T]) ForEach(items []T, fn func(int, *T)) {
+func (iter Iterator[T]) ForEach(items []T, fn func(int, T)) {
 	forEach(items, fn, iter.MaxWorkers)
 }
 
-func forEach[T any](items []T, fn func(int, *T), numWorkers int) {
+func forEach[T any](items []T, fn func(int, T), numWorkers int) {
 	if numWorkers == 0 {
 		numWorkers = runtime.GOMAXPROCS(0)
 	}
@@ -33,7 +33,7 @@ func forEach[T any](items []T, fn func(int, *T), numWorkers int) {
 	proc := func() {
 		next := cur.Add(1) - 1
 		for next < int64(numItems) {
-			fn(int(next), &items[next])
+			fn(int(next), items[next])
 			next = cur.Add(1) - 1
 		}
 	}
