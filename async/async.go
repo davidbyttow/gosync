@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/davidbyttow/gosync/safe"
+	gosync "github.com/davidbyttow/gosync/sync"
 )
 
 func ForEach[T any](items []T, fn func(int, T)) {
@@ -135,6 +136,30 @@ func (p *ErrorPool) maybeAddError(err error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.err = joinErrors(p.err, err)
+}
+
+type ResultPool[T any] struct {
+	pool    *ErrorPool
+	results gosync.List[T]
+}
+
+func NewResultPool[T any]() *ResultPool[T] {
+	return &ResultPool[T]{pool: NewPool().WithErrors()}
+}
+
+func (p *ResultPool[T]) Go(fn func() (T, error)) {
+	p.pool.Go(func() error {
+		res, err := fn()
+		if err == nil {
+			p.results.Append(res)
+		}
+		return err
+	})
+}
+
+func (p *ResultPool[T]) Wait() ([]T, error) {
+	err := p.pool.Wait()
+	return p.results.Slice(), err
 }
 
 type WaitGroup struct {
