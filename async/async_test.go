@@ -2,6 +2,7 @@ package async_test
 
 import (
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -143,5 +144,44 @@ func TestErrorPool(t *testing.T) {
 		})
 		err := pool.Wait()
 		require.Equal(t, "one\ntwo", err.Error())
+	})
+}
+
+func TestResultPool(t *testing.T) {
+	t.Parallel()
+
+	err1 := errors.New("one")
+	err2 := errors.New("two")
+
+	t.Run("returns values", func(t *testing.T) {
+		t.Parallel()
+		pool := async.NewResultPool[int]()
+		for i := 0; i < 3; i++ {
+			i := i
+			pool.Go(func() (int, error) {
+				return i, nil
+			})
+		}
+		res, err := pool.Wait()
+		require.ElementsMatch(t, res, []int{0, 1, 2})
+		require.NoError(t, err)
+	})
+	t.Run("handles errors", func(t *testing.T) {
+		t.Parallel()
+		pool := async.NewResultPool[int]()
+		for i := 0; i < 4; i++ {
+			i := i
+			pool.Go(func() (int, error) {
+				if i == 1 {
+					return 0, err1
+				} else if i == 3 {
+					return 0, err2
+				}
+				return i, nil
+			})
+		}
+		res, err := pool.Wait()
+		require.ElementsMatch(t, res, []int{0, 2})
+		require.ElementsMatch(t, strings.Split(err.Error(), "\n"), []string{"one", "two"})
 	})
 }
